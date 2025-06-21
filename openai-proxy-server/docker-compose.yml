@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  openai-proxy:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - COZE_API_KEY=${COZE_API_KEY}
+      - COZE_BASE_URL=${COZE_BASE_URL:-https://api.coze.com}
+      - COZE_BOT_ID=${COZE_BOT_ID}
+      - COZE_WORKFLOW_ID=${COZE_WORKFLOW_ID}
+      - DEFAULT_MODEL_TYPE=${DEFAULT_MODEL_TYPE:-chat}
+      - ENABLE_CORS=${ENABLE_CORS:-true}
+      - ENABLE_LOGGING=${ENABLE_LOGGING:-true}
+    volumes:
+      - ./.env:/app/.env:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
