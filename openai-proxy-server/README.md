@@ -33,7 +33,8 @@ const response = await openai.chat.completions.create({
 - 🚀 **100% OpenAI Compatible**: Use the standard OpenAI SDK without modifications
 - 🔄 **Multiple Model Types**: Support for Chat, Conversation, and Workflow
 - 📡 **Streaming Support**: Real-time streaming for chat and workflow
-- 🛠 **TypeScript**: Full type safety and IntelliSense support
+- � **JWT Authentication**: Support for OAuth JWT authentication with automatic token refresh
+- �🛠 **TypeScript**: Full type safety and IntelliSense support
 - ⚙️ **REST API**: Standard REST endpoints following OpenAI specifications
 - 🔌 **Headers-based Routing**: Control model types via HTTP headers
 - 🔒 **Production Ready**: CORS, security headers, error handling
@@ -65,7 +66,9 @@ Copy the environment template:
 cp .env.example .env
 ```
 
-Edit `.env` with your Coze credentials:
+Edit `.env` with your Coze credentials. You can choose between two authentication methods:
+
+#### Option 1: API Key Authentication (Legacy)
 ```bash
 # Coze API Configuration
 COZE_API_KEY=your-coze-api-key
@@ -77,6 +80,29 @@ COZE_WORKFLOW_ID=your-workflow-id
 PORT=3000
 DEFAULT_MODEL_TYPE=chat
 ```
+
+#### Option 2: JWT Authentication (Recommended)
+```bash
+# JWT Authentication Configuration
+COZE_JWT_APP_ID=your_jwt_app_id
+COZE_JWT_KEY_ID=your_jwt_key_id
+COZE_JWT_AUD=api.coze.com
+COZE_JWT_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\nYour private key content\n-----END PRIVATE KEY-----
+COZE_JWT_SESSION_NAME=openai-proxy
+
+# Coze Configuration
+COZE_BASE_URL=https://api.coze.com
+COZE_BOT_ID=your-bot-id
+COZE_WORKFLOW_ID=your-workflow-id
+
+# Server Configuration
+PORT=3000
+DEFAULT_MODEL_TYPE=chat
+```
+
+> **Note**: If `COZE_JWT_APP_ID` is provided, JWT authentication will be used automatically instead of the API key. JWT tokens are automatically refreshed when they expire.
+>
+> **📋 For detailed JWT setup instructions, see [JWT-SETUP.md](./JWT-SETUP.md)**
 
 ### 3. Start the Server
 
@@ -122,6 +148,38 @@ All standard OpenAI API endpoints are supported:
 - `POST /v1/chat/completions` - Chat completions (streaming & non-streaming)
 - `GET /v1/models` - List available models
 - `GET /health` - Health check (additional endpoint)
+
+### JWT Authentication Endpoints
+
+When using JWT authentication, these additional endpoints are available:
+
+- `GET /get_jwt` - Get current JWT token (creates new one if needed)
+- `POST /refresh_jwt` - Force refresh JWT token
+- `DELETE /clear_jwt` - Clear current JWT token
+
+#### JWT Endpoint Examples
+
+```bash
+# Get current JWT token
+curl http://localhost:3000/get_jwt
+
+# Response
+{
+  "success": true,
+  "token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "info": {
+    "hasToken": true,
+    "isValid": true,
+    "expiresIn": 3600
+  }
+}
+
+# Force refresh token
+curl -X POST http://localhost:3000/refresh_jwt
+
+# Clear token (force refresh on next request)
+curl -X DELETE http://localhost:3000/clear_jwt
+```
 
 ### Request Format
 

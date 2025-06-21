@@ -9,7 +9,9 @@
     "start": "node dist/server.js",
     "start:dev": "tsx src/server.ts",
     "test": "tsx examples/test-client.ts",
-    "test:raw": "tsx examples/raw-http-test.ts"
+    "test:raw": "tsx examples/raw-http-test.ts",
+    "test:jwt": "node test-jwt.js",
+    "example:jwt": "tsx examples/jwt-example.ts"
   },
   "keywords": [
     "openai",

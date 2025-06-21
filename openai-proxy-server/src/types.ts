@@ -63,12 +63,20 @@ export interface OpenAIChatCompletionStreamResponse {
 // Proxy Configuration Types
 export interface ProxyConfig {
   coze: {
-    apiKey: string;
+    apiKey?: string;
     baseURL?: string;
     baseWsURL?: string;
     botId?: string;
     workflowId?: string;
     spaceId?: string;
+    // JWT 配置
+    jwt?: {
+      appId: string;
+      keyId: string;
+      aud: string;
+      privateKey: string;
+      sessionName?: string;
+    };
   };
   defaultModelType: 'chat' | 'conversation' | 'workflow';
   port: number;
@@ -79,6 +87,13 @@ export interface ProxyConfig {
   logging: {
     enabled: boolean;
   };
+}
+
+// JWT Token Response
+export interface JWTTokenResponse {
+  access_token: string;
+  expires_in: number;
+  token_type: string;
 }
 
 // Internal Types

@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import { ChatHandler } from './handlers/chat-handler';
 import { ConversationHandler } from './handlers/conversation-handler';
 import { WorkflowHandler } from './handlers/workflow-handler';
+import { JWTManager } from './jwt-manager';
 import type { OpenAIChatCompletionRequest, ProxyConfig } from './types';
 
 // Load environment variables
@@ -20,6 +21,14 @@ const config: ProxyConfig = {
     botId: process.env.COZE_BOT_ID,
     workflowId: process.env.COZE_WORKFLOW_ID,
     spaceId: process.env.COZE_SPACE_ID,
+    // JWT 配置
+    jwt: process.env.COZE_JWT_APP_ID ? {
+      appId: process.env.COZE_JWT_APP_ID,
+      keyId: process.env.COZE_JWT_KEY_ID || '',
+      aud: process.env.COZE_JWT_AUD || '',
+      privateKey: process.env.COZE_JWT_PRIVATE_KEY || '',
+      sessionName: process.env.COZE_JWT_SESSION_NAME || 'openai-proxy',
+    } : undefined,
   },
   defaultModelType: (process.env.DEFAULT_MODEL_TYPE as any) || 'chat',
   port: parseInt(process.env.PORT || '3000'),
@@ -37,12 +46,14 @@ class OpenAIProxyServer {
   private chatHandler: ChatHandler;
   private conversationHandler: ConversationHandler;
   private workflowHandler: WorkflowHandler;
+  private jwtManager: JWTManager;
 
   constructor() {
     this.app = express();
-    this.chatHandler = new ChatHandler(config);
-    this.conversationHandler = new ConversationHandler(config);
-    this.workflowHandler = new WorkflowHandler(config);
+    this.jwtManager = new JWTManager(config);
+    this.chatHandler = new ChatHandler(config, this.jwtManager);
+    this.conversationHandler = new ConversationHandler(config, this.jwtManager);
+    this.workflowHandler = new WorkflowHandler(config, this.jwtManager);
 
     this.setupMiddleware();
     this.setupRoutes();
@@ -74,17 +85,25 @@ class OpenAIProxyServer {
   private setupRoutes() {
     // Health check
     this.app.get('/health', (req: Request, res: Response) => {
+      const jwtInfo = this.jwtManager.getTokenInfo();
       res.json({
         status: 'ok',
         timestamp: new Date().toISOString(),
         config: {
           hasCozeApiKey: !!config.coze.apiKey,
+          hasJWTConfig: !!config.coze.jwt,
           defaultModelType: config.defaultModelType,
           hasBotId: !!config.coze.botId,
           hasWorkflowId: !!config.coze.workflowId,
-        }
+        },
+        jwt: jwtInfo,
       });
     });
+
+    // JWT Token endpoints
+    this.app.get('/get_jwt', this.handleGetJWT.bind(this));
+    this.app.post('/refresh_jwt', this.handleRefreshJWT.bind(this));
+    this.app.delete('/clear_jwt', this.handleClearJWT.bind(this));
 
     // OpenAI compatible endpoints
     this.app.post('/v1/chat/completions', this.handleChatCompletions.bind(this));
@@ -136,6 +155,48 @@ class OpenAIProxyServer {
     });
   }
 
+  // JWT Token Handlers
+  private async handleGetJWT(req: Request, res: Response, next: NextFunction) {
+    try {
+      const token = await this.jwtManager.getToken();
+      const tokenInfo = this.jwtManager.getTokenInfo();
+
+      res.json({
+        success: true,
+        token,
+        info: tokenInfo,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  private async handleRefreshJWT(req: Request, res: Response, next: NextFunction) {
+    try {
+      const tokenResponse = await this.jwtManager.refreshToken();
+
+      res.json({
+        success: true,
+        ...tokenResponse,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  private async handleClearJWT(req: Request, res: Response, next: NextFunction) {
+    try {
+      this.jwtManager.clearToken();
+
+      res.json({
+        success: true,
+        message: 'JWT token cleared successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   private async handleChatCompletions(req: Request, res: Response, next: NextFunction) {
     try {
       const request: OpenAIChatCompletionRequest = req.body;
@@ -162,7 +223,7 @@ class OpenAIProxyServer {
       const conversationId = req.headers['x-conversation-id'] as string;
 
       // Add these to the request object for handlers to use
-      request['x-model-type'] = modelType;
+      request['x-model-type'] = modelType as 'chat' | 'conversation' | 'workflow';
       request['x-bot-id'] = botId;
       request['x-workflow-id'] = workflowId;
       request['x-conversation-id'] = conversationId;

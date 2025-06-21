@@ -1,5 +1,6 @@
 import { CozeAPI } from '@coze/api';
 import { MessageConverter } from '../message-converter';
+import { JWTManager } from '../jwt-manager';
 import type {
   OpenAIChatCompletionRequest,
   ProxyConfig,
@@ -9,12 +10,16 @@ import type {
 export class ConversationHandler {
   private coze: CozeAPI;
   private config: ProxyConfig;
+  private jwtManager: JWTManager;
   private sessions: Map<string, ConversationSession> = new Map();
 
-  constructor(config: ProxyConfig) {
+  constructor(config: ProxyConfig, jwtManager: JWTManager) {
     this.config = config;
+    this.jwtManager = jwtManager;
     this.coze = new CozeAPI({
-      token: config.coze.apiKey,
+      token: async () => {
+        return await this.jwtManager.getToken();
+      },
       baseURL: config.coze.baseURL,
     });
   }

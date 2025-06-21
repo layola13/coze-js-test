@@ -1,16 +1,21 @@
 import { CozeAPI, ChatEventType, ChatStatus } from '@coze/api';
 import { Response } from 'express';
 import { MessageConverter } from '../message-converter';
+import { JWTManager } from '../jwt-manager';
 import type { OpenAIChatCompletionRequest, ProxyConfig } from '../types';
 
 export class ChatHandler {
   private coze: CozeAPI;
   private config: ProxyConfig;
+  private jwtManager: JWTManager;
 
-  constructor(config: ProxyConfig) {
+  constructor(config: ProxyConfig, jwtManager: JWTManager) {
     this.config = config;
+    this.jwtManager = jwtManager;
     this.coze = new CozeAPI({
-      token: config.coze.apiKey,
+      token: async () => {
+        return await this.jwtManager.getToken();
+      },
       baseURL: config.coze.baseURL,
     });
   }
